@@ -47,5 +47,8 @@ qtcreator-*
 # Emacs
 .#*
 
+rrt_star/.idea
+rrt_star/cmake-build-debug
+
 # Catkin custom files
 CATKIN_IGNORE
