@@ -42,4 +42,9 @@ private:
 
     void control_callback(const youbot_msgs::Control &control_msg);
 
+    float l, r, w_max;
+    Eigen::MatrixXf w_T_v;
+    Eigen::MatrixXf v_T_w;
+
+
 };

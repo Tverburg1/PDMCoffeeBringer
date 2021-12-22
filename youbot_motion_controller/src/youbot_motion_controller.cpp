@@ -6,6 +6,19 @@ YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_han
     pub_arm_ = nh_.advertise<trajectory_msgs::JointTrajectory>("/arm_1/arm_controller/command", 100);
     base_position_client_ = nh_.serviceClient<gazebo_msgs::GetLinkState>("/gazebo/get_link_state");
     arm_position_client_ = nh_.serviceClient<gazebo_msgs::GetJointProperties>("/gazebo/get_joint_properties");
+
+    l = 0.38573, r = 0.05, w_max = 5250 * 2 * M_PI / 60 / 26;
+    w_T_v.resize(4, 3);
+    w_T_v << 1, -1, -l,
+            1, 1, l,
+            1, 1, -l,
+            1, -1, l;
+    w_T_v *= 1/r;
+    v_T_w.resize(3, 4);
+    v_T_w << 1, 1, 1, 1,
+            -1, 1, 1, -1,
+            -1 / l, 1 / l, -1 / l, 1 / l;
+    v_T_w *= r/4;
 }
 
 void YouBotMotionController::control_callback(const youbot_msgs::Control &control_msg) {
@@ -56,20 +69,16 @@ void YouBotMotionController::move_arm(const Eigen::VectorXf &arm_configuration, 
 void YouBotMotionController::move_base_direction(float v_x, float v_y, float v_angular) const {
     geometry_msgs::Twist base_msg;
     // Check domain of input velocity
-    Eigen::Vector2f direction(v_x, v_y);
-    if (direction.norm() > 1) {
-        direction.normalize();
+    Eigen::Vector3f direction(v_x, v_y, v_angular);
+    Eigen::Vector4f w = w_T_v * direction;
+    float current_max = w.cwiseAbs().maxCoeff();
+    if (current_max > w_max){
+        w *= w_max/current_max;
+        direction = v_T_w * w;
     }
-    base_msg.linear.x = direction(0);
-    base_msg.linear.y = direction(1);
-    if (v_angular > 1) {
-        v_angular = 1;
-    } else if (v_angular < -1) {
-        v_angular = -1;
-    }
-    base_msg.linear.x = direction(0);
-    base_msg.linear.y = direction(1);
-    base_msg.angular.z = v_angular;
+    base_msg.linear.x = direction.x();
+    base_msg.linear.y = direction.y();
+    base_msg.angular.z = direction.z();
     pub_base_.publish(base_msg);
 }
 
