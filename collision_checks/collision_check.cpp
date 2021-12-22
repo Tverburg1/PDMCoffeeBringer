@@ -5,6 +5,7 @@
 #include<math.h>
 #include<cmath>
 #include<Eigen/Dense>
+#include<iostream>
 
 using namespace std;
 using namespace Eigen;
@@ -60,6 +61,8 @@ bool check_collision_between_two_configurations(VectorXf begin, VectorXf end)
 		
 		i++;
 	}
+	
+	return collision_found;
 }
 
 
@@ -86,7 +89,6 @@ bool check_collision_single_configuration(VectorXf configuration)
 			collision_found = check_collision_with_pointcloud(youbot_spheres);
 		}
 	}
-	
 	return collision_found;
 }
 
@@ -186,7 +188,7 @@ bool check_collision_with_floor(vector<coordinate_3d> youbot_spheres)
 	{
 		collision_found = (youbot_spheres[i].z_ < youbot_spheres[i].radius_);
 		
-		i++:
+		i++;
 	}
 	
 	return collision_found;
@@ -205,11 +207,7 @@ bool check_self_collision(vector<coordinate_3d> youbot_spheres)
 	int i = 2;
 	while( (i<youbot_spheres.size()) and !collision_found)
 	{
-		if youbot_spheres[0].in_collision_with_(youbot_spheres[i]);
-		{
-			collision_found = true;
-		}
-		
+		collision_found = youbot_spheres[0].in_collision_with_(youbot_spheres[i]);
 		i++;
 	}
 	
@@ -217,10 +215,7 @@ bool check_self_collision(vector<coordinate_3d> youbot_spheres)
 	i = 4;
 	while( (i<youbot_spheres.size()) and !collision_found)
 	{
-		if youbot_spheres[1].in_collision_with_(youbot_spheres[i]);
-		{
-			collision_found = true;
-		}
+		collision_found = youbot_spheres[1].in_collision_with_(youbot_spheres[i]);
 		
 		i++;
 	}
@@ -229,14 +224,11 @@ bool check_self_collision(vector<coordinate_3d> youbot_spheres)
 	i = 6;
 	while( (i<youbot_spheres.size()) and !collision_found)
 	{
-		if youbot_spheres[2].in_collision_with_(youbot_spheres[i]);
-		{
-			collision_found = true;
-		}
+		collision_found = youbot_spheres[2].in_collision_with_(youbot_spheres[i]);
 		
-		if youbot_spheres[3].in_collision_with_(youbot_spheres[i]);
+		if (!collision_found)
 		{
-			collision_found = true;
+			collision_found = youbot_spheres[3].in_collision_with_(youbot_spheres[i]);
 		}
 		
 		i++;
@@ -312,7 +304,7 @@ vector<coordinate_3d> divide_youbot_into_spheres(vector<coordinate_3d> joint_pos
 {
 	vector<coordinate_3d> youbot_spheres (8);
 	
-	coordinate_3d base (joint_positions[0].x_, joint_positions[0].y_, -0.3, 0.66);
+	coordinate_3d base (joint_positions[0].x_, joint_positions[0].y_, -1.0, 1.2);
 	youbot_spheres[0] = base;
 	
 	coordinate_3d arm_base (joint_positions[1].x_, joint_positions[1].y_, joint_positions[1].z_, 0.14);

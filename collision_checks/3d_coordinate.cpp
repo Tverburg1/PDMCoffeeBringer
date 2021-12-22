@@ -1,6 +1,7 @@
 #include"3d_coordinate.h"
 #include<cmath>
 #include<math.h>
+#include<iostream>
 
 using namespace std;
 
