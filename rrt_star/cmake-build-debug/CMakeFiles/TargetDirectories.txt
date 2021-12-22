@@ -1,3 +1,0 @@
-/home/jravenberg/PDMCoffeeBringer/rrt_star_no_viz.cpp/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/home/jravenberg/PDMCoffeeBringer/rrt_star_no_viz.cpp/cmake-build-debug/CMakeFiles/edit_cache.dir
-/home/jravenberg/PDMCoffeeBringer/rrt_star_no_viz.cpp/cmake-build-debug/CMakeFiles/rrt_star.dir
