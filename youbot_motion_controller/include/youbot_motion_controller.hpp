@@ -31,7 +31,7 @@ public:
 
     void process_configs();
 
-    Eigen::VectorXf travel_time(const Eigen::VectorXf &config1, const Eigen::VectorXf &config2);
+    Eigen::VectorXf get_travel_time(const Eigen::VectorXf &config1, const Eigen::VectorXf &config2);
 
     float kp_xy = 10;
     float kp_theta = 10;

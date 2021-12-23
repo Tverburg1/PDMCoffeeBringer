@@ -114,7 +114,7 @@ void YouBotMotionController::process_configs() {
     }
 }
 
-Eigen::VectorXf YouBotMotionController::travel_time(const Eigen::VectorXf &config1, const Eigen::VectorXf &config2) {
+Eigen::VectorXf YouBotMotionController::get_travel_time(const Eigen::VectorXf &config1, const Eigen::VectorXf &config2) {
     Eigen::VectorXf configuration = config2 - config1;
     // Compute max velocity of the base
     Eigen::Rotation2Df t(config1(2));
