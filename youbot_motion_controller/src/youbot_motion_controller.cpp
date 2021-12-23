@@ -13,12 +13,14 @@ YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_han
             1, 1, l,
             1, 1, -l,
             1, -1, l;
-    w_T_v *= 1/r;
+    w_T_v *= 1 / r;
     v_T_w.resize(3, 4);
     v_T_w << 1, 1, 1, 1,
             -1, 1, 1, -1,
             -1 / l, 1 / l, -1 / l, 1 / l;
-    v_T_w *= r/4;
+    v_T_w *= r / 4;
+    joint_velocity.resize(5);
+    joint_velocity << 5.75, 0.27, 0.6, 0.45, 0.55;
 }
 
 void YouBotMotionController::control_callback(const youbot_msgs::Control &control_msg) {
@@ -72,8 +74,8 @@ void YouBotMotionController::move_base_direction(float v_x, float v_y, float v_a
     Eigen::Vector3f direction(v_x, v_y, v_angular);
     Eigen::Vector4f w = w_T_v * direction;
     float current_max = w.cwiseAbs().maxCoeff();
-    if (current_max > w_max){
-        w *= w_max/current_max;
+    if (current_max > w_max) {
+        w *= w_max / current_max;
         direction = v_T_w * w;
     }
     base_msg.linear.x = direction.x();
@@ -104,4 +106,23 @@ void YouBotMotionController::process_configs() {
 
     move_base_direction(direction(0), direction(1), v_angular);
     move_arm(config_goal.tail(5), ros::Duration(0.5));
+}
+
+Eigen::VectorXf YouBotMotionController::travel_time(const Eigen::VectorXf &config1, const Eigen::VectorXf &config2) {
+    Eigen::VectorXf configuration = config2 - config1;
+    // Compute max velocity of the base
+    Eigen::Rotation2Df t(config1(2));
+    Eigen::Vector2f distance = t * configuration.head<2>();
+    Eigen::Vector3f v_base(distance(0), distance(1), configuration(2));
+    Eigen::Vector4f w = w_T_v * v_base;
+    w *= w_max / w.cwiseAbs().maxCoeff();
+    v_base = v_T_w * w;
+
+    Eigen::VectorXf velocity(8);
+    velocity << v_base, joint_velocity;
+    Eigen::VectorXf travel_time = (configuration.array() / velocity.array()).cwiseAbs();
+    for (int i = 0; i < 8; i++) {
+        travel_time(i) = std::isnan(travel_time(i)) ? 0.0 : travel_time(i);
+    }
+    return travel_time;
 }
