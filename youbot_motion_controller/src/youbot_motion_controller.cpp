@@ -21,6 +21,8 @@ YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_han
     v_T_w *= r / 4;
     joint_velocity.resize(5);
     joint_velocity << 0.75, 0.27, 0.6, 0.45, 0.55;
+
+    arm_on_its_way = false;
 }
 
 void YouBotMotionController::control_callback(const youbot_msgs::Control &control_msg) {
@@ -96,6 +98,7 @@ void YouBotMotionController::process_configs() {
     if ((config_goal - config_current).norm() < 0.01) { // Configuration reached
         pub_base_.publish(base_msg); // stop base movement
         config_to_go_.pop();
+        arm_on_its_way = false;
         return;
     }
 
@@ -105,7 +108,10 @@ void YouBotMotionController::process_configs() {
     float v_angular = kp_theta * (config_goal(2) - config_current(2));
 
     move_base_direction(direction(0), direction(1), v_angular);
-    move_arm(config_goal.tail(5), ros::Duration(0.5));
+    if (!arm_on_its_way){
+        arm_on_its_way = true;
+        move_arm(config_goal.tail(5), ros::Duration(0.5));
+    }
 }
 
 Eigen::VectorXf YouBotMotionController::travel_time(const Eigen::VectorXf &config1, const Eigen::VectorXf &config2) {

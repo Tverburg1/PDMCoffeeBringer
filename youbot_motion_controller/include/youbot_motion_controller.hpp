@@ -47,4 +47,5 @@ private:
     float l, r, w_max;
     Eigen::MatrixXf w_T_v, v_T_w;
     Eigen::VectorXf joint_velocity;
+    bool arm_on_its_way;
 };
