@@ -20,7 +20,7 @@ YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_han
             -1 / l, 1 / l, -1 / l, 1 / l;
     v_T_w *= r / 4;
     joint_velocity.resize(5);
-    joint_velocity << 5.75, 0.27, 0.6, 0.45, 0.55;
+    joint_velocity << 0.75, 0.27, 0.6, 0.45, 0.55;
 }
 
 void YouBotMotionController::control_callback(const youbot_msgs::Control &control_msg) {
