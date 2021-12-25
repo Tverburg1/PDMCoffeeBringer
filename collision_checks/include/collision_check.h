@@ -3,7 +3,7 @@
 
 #include"3d_coordinate.h"
 #include<vector>
-#include<Eigen/Dense>
+#include<eigen3/Eigen/Dense>
 
 // Function for checking whether a linear trajectory between 2 configurations
 // (begin and end) is collision-free. 
