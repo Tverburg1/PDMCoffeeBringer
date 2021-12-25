@@ -32,11 +32,5 @@ add_executable(youbot_motion_controller_node src/youbot_motion_controller_node.c
 add_executable(youbot_configuration_publisher src/youbot_configuration_publisher.cpp src/youbot_motion_controller.cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(
-        youbot_motion_controller_node
-        ${catkin_LIBRARIES}
-)
-target_link_libraries(
-        youbot_configuration_publisher
-        ${catkin_LIBRARIES}
-)
+target_link_libraries(youbot_motion_controller_node ${catkin_LIBRARIES})
+target_link_libraries(youbot_configuration_publisher ${catkin_LIBRARIES})

@@ -5,8 +5,9 @@ int main(int argc, char *argv[]) {
     ros::init(argc, argv, "youbot_configuration_publisher");
     ros::NodeHandle node_handle("~");
     ros::Publisher pub = node_handle.advertise<youbot_msgs::Control>("/youbot/current_configuration", 100);
-    YouBotMotionController ymc(node_handle);
-    ros::Rate rate(20);
+    float frequency = 20;
+    YouBotMotionController ymc(node_handle, 1 / frequency);
+    ros::Rate rate(frequency);
     while (ros::ok()) {
         youbot_msgs::Control msg;
         auto config = ymc.get_current_configuration();

@@ -3,8 +3,9 @@
 int main(int argc, char **argv) {
     ros::init(argc, argv, "youbot_motion_controller_node");
     ros::NodeHandle node_handle;
-    YouBotMotionController ymc(node_handle);
-    ros::Rate rate(50);
+    float frequency = 50;
+    YouBotMotionController ymc(node_handle, 1 / frequency);
+    ros::Rate rate(frequency);
 
     while (ros::ok()) {
         ymc.process_configs();
