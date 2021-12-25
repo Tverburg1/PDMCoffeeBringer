@@ -1,6 +1,7 @@
 #include "youbot_motion_controller.hpp"
 
-YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_handle, float dt) : nh_(private_node_handle), dt(dt) {
+YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_handle, float dt) : nh_(
+        private_node_handle), dt(dt) {
     sub_config_ = nh_.subscribe("/youbot/control", 1, &YouBotMotionController::control_callback, this);
     sub_pid_ = nh_.subscribe("/youbot/base/set_controller", 1, &YouBotMotionController::set_controller_callback, this);
     pub_base_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 100);
@@ -82,6 +83,15 @@ void YouBotMotionController::move_arm(const Eigen::VectorXf &arm_configuration, 
     pub_arm_.publish(arm_msg);
 }
 
+void YouBotMotionController::move_base_towards_position(Eigen::Vector3f position) {
+    Eigen::Vector3f current_pos = get_current_configuration().head<3>();
+    Eigen::Vector3f dist = position - current_pos;
+    Eigen::AngleAxis<float> t(current_pos(2), Eigen::Vector3f(0, 0, 1));
+//    F = k_pos * x - k_vel * e^{-k_exp_vel * |x|} * v
+    Eigen::Vector3f force = t.inverse() * dist * k_pos - k_vel * std::exp(-k_exp_vel * dist.norm()) * v_current;
+    apply_force_on_base(force);
+}
+
 void YouBotMotionController::apply_force_on_base(Eigen::Vector3f &force) {
     geometry_msgs::Twist base_msg;
     // Check domain of input velocity
@@ -91,6 +101,7 @@ void YouBotMotionController::apply_force_on_base(Eigen::Vector3f &force) {
     base_msg.angular.z = v_current.z();
     pub_base_.publish(base_msg);
 }
+
 Eigen::Vector3f YouBotMotionController::get_base_velocity_from_force(Eigen::Vector3f &force) const {
     float w_acc_max = T_max / I_wheel;
     // Calculate new velocity with a small time step dt
@@ -110,8 +121,24 @@ Eigen::Vector3f YouBotMotionController::get_base_velocity_from_force(Eigen::Vect
     return v_new;
 }
 
+void YouBotMotionController::brake() {
+    if ((v_current.array() == 0).all()) {
+        return;
+    }
+    Eigen::Vector3f F_opposite = -1000 * v_current;
+    Eigen::Vector3f v_min = get_base_velocity_from_force(F_opposite);
+    if ((v_current.cwiseProduct(v_min).array() < 0).all()) {
+        geometry_msgs::Twist base_msg;
+        pub_base_.publish(base_msg);
+        v_current.setZero();
+    } else {
+        move_base_towards_position(previous_config_.head<3>());
+    }
+}
+
 void YouBotMotionController::process_configs() {
     if (config_to_go_.empty()) {
+        brake();
         return;
     }
 
@@ -119,28 +146,22 @@ void YouBotMotionController::process_configs() {
     Eigen::VectorXf config_current = get_current_configuration();
 
     if ((config_goal - config_current).norm() < 0.01) { // Configuration reached
+        previous_config_ = config_goal;
         config_to_go_.pop();
         arm_on_its_way = false;
-        if (config_to_go_.empty()) {
-            brake();
-        }
         return;
     }
 
-    Eigen::Vector3f current_pos = get_current_configuration().head<3>();
-    Eigen::Vector3f dist = config_goal.head<3>() - current_pos;
-    Eigen::AngleAxis<float> t(current_pos(2), Eigen::Vector3f(0, 0, 1));
-//    F = k_pos * x - k_vel * e^{-k_exp_vel * |x|} * v
-    Eigen::Vector3f force = t.inverse() * dist * k_pos - k_vel * std::exp(-k_exp_vel * dist.norm()) * v_current;
-    apply_force_on_base(force);
+    move_base_towards_position(config_goal.head<3>());
 
-    if (!arm_on_its_way){
+    if (!arm_on_its_way) {
         arm_on_its_way = true;
         move_arm(config_goal.tail(5), ros::Duration(0.5));
     }
 }
 
-Eigen::VectorXf YouBotMotionController::get_travel_time(const Eigen::VectorXf &config1, const Eigen::VectorXf &config2) {
+Eigen::VectorXf
+YouBotMotionController::get_travel_time(const Eigen::VectorXf &config1, const Eigen::VectorXf &config2) {
     Eigen::VectorXf configuration = config2 - config1;
     // Compute max velocity of the base
     Eigen::Rotation2Df t(config1(2));
@@ -157,19 +178,4 @@ Eigen::VectorXf YouBotMotionController::get_travel_time(const Eigen::VectorXf &c
         travel_time(i) = std::isnan(travel_time(i)) ? 0.0 : travel_time(i);
     }
     return travel_time;
-}
-
-void YouBotMotionController::brake() {
-    if ((v_current.array() == 0).all()){
-        return;
-    }
-    Eigen::Vector3f F_opposite = -1000 * v_current;
-    Eigen::Vector3f v_min = get_base_velocity_from_force(F_opposite);
-    if ((v_current.cwiseProduct(v_min).array() < 0).all()) {
-        geometry_msgs::Twist base_msg;
-        pub_base_.publish(base_msg);
-        v_current.setZero();
-    } else {
-        apply_force_on_base(F_opposite);
-    }
 }

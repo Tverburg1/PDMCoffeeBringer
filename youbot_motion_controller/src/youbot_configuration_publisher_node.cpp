@@ -2,7 +2,7 @@
 
 
 int main(int argc, char *argv[]) {
-    ros::init(argc, argv, "youbot_configuration_publisher");
+    ros::init(argc, argv, "youbot_configuration_publisher_node");
     ros::NodeHandle node_handle("~");
     ros::Publisher pub = node_handle.advertise<youbot_msgs::Control>("/youbot/current_configuration", 100);
     float frequency = 20;

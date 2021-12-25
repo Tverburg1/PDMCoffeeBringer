@@ -21,6 +21,7 @@ public:
     explicit YouBotMotionController(ros::NodeHandle &private_node_handle, float dt);
 
     std::queue<Eigen::VectorXf> config_to_go_;
+    Eigen::VectorXf previous_config_;
     ros::Publisher pub_base_;
     ros::Publisher pub_arm_;
 
@@ -31,6 +32,8 @@ public:
     void apply_force_on_base(Eigen::Vector3f &force);
 
     void brake();
+
+    void move_base_towards_position(Eigen::Vector3f position);
 
     void process_configs();
 
@@ -53,7 +56,7 @@ private:
 
     float l, r, w_max;
     float m_tot, I_tot, I_wheel, T_max, dt;
-    Eigen::Array<float, 3, 1>  mass_array;
+    Eigen::Array<float, 3, 1> mass_array;
     Eigen::MatrixXf w_J_c, c_J_w;
     Eigen::Vector3f v_current;
     Eigen::VectorXf joint_velocity;
