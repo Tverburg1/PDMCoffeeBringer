@@ -15,14 +15,15 @@ using namespace Eigen;
 const float EPS = 1e-6;
 
 const int num_dim = 7;
-const int max_iterations = 6000;
+const int max_iterations = 10000;
 
-const int RADIUS = 5 ; // Radius of region around the goal point for which success is defined
+const float RADIUS = 1 ; // Radius of region around the goal point for which success is defined
 const float GOAL_SAMPLING_PROB = 0.05;
 const float INF = 1e18;
 
 //Load the point cloud in vector<coordinate_3d> point_cloud_environment
-int data_ok = load_pointcloud_data ("../collision_checks/point_cloud/scene3_filtered.xyz.txt");
+int data_ok = load_pointcloud_data ("../../collision_checks/pointcloud/scene3_filtered.xyz");
+using Vector7f = Matrix<float, 7, 1> ;
 
 // Function that obtains the maximum and minimum x and y values
 vector<float> get_min_max_pc(vector<coordinate_3d> point_cloud){
@@ -47,28 +48,28 @@ vector<float> bounds_2d = get_min_max_pc(point_cloud_environment);
 // The bounds of the dimensions of the configuration space should be defined here
 
 MatrixXf get_bounds(){
-    MatrixXf bounds(num_dim, 2) ;
-    bounds(0,0) = 0;
-//            bounds_2d[0], bounds_2d[1],
-//             bounds_2d[2], bounds_2d[3] ,
-//             0.0, 2 * M_PI ,
-//             -169 / 180 * M_PI, 169 / 180 * M_PI ,
-//             -65 / 180 * M_PI, 90 / 180 * M_PI ,
-//             -146 / 180 * M_PI, 150 / 180 * M_PI ,
-//             -102.5 / 180 * M_PI, 102.5 / 180 * M_PI
-
+    MatrixXf bounds(num_dim, 2);
+    bounds <<
+        bounds_2d[0], bounds_2d[1],
+        bounds_2d[2], bounds_2d[3] ,
+        0.0, 2 * M_PI ,
+        -169 / 180 * M_PI, 169 / 180 * M_PI ,
+         -65 / 180 * M_PI, 90 / 180 * M_PI ,
+        -146 / 180 * M_PI, 150 / 180 * M_PI ,
+        -102.5 / 180 * M_PI, 102.5 / 180 * M_PI;
 
     return bounds;
 }
 MatrixXf bounds = get_bounds();
 
-VectorXf diff = bounds.col(1)-bounds.col(2);
-float JUMP_SIZE = diff.sum()/(pow(100.0,num_dim))/1.5; // same as before but now generalized
+Vector7f diff = bounds.col(1)-bounds.col(0);
+//float JUMP_SIZE = diff.sum()/(pow(100.0,num_dim)); // same as before but now generalized
+float JUMP_SIZE = 0.5;
 float DISK_SIZE = JUMP_SIZE ; // Ball radius around which nearby points are found
 
-VectorXf start(num_dim), stop(num_dim) ;
+Vector7f start(num_dim), stop(num_dim) ;
 
-vector < VectorXf > nodes(num_dim) ;
+vector < Vector7f > nodes;
 vector < int > parent, nearby ;
 vector < float > cost, jumps ;
 int nodeCnt = 0, goalIndex = -1 ;
@@ -83,16 +84,17 @@ float cbest = INF;
 
 //create matrices for designing the ellipsoid
 MatrixXf M;
-VectorXf midline(num_dim), center(num_dim);
+Vector7f midline, center;
 MatrixXf C(num_dim, num_dim);
 MatrixXf L;
 
-vector< VectorXf > sampled_nodes(num_dim);
+vector< Vector7f > sampled_nodes;
 
-vector < VectorXf > get_path(){
-    vector < VectorXf > optimal_path(num_dim);
+vector < Vector7f > get_path(){
+    vector < Vector7f > optimal_path;
     // loop that retraces the shortest path from the goal to start
     int node = goalIndex;
+    optimal_path.push_back(stop);
     optimal_path.push_back(nodes[node]);
     while (parent[node] != node) {
         int par = parent[node];
@@ -104,10 +106,10 @@ vector < VectorXf > get_path(){
     return optimal_path;
 }
 
-void write_to_file(vector < VectorXf > optimal_path){
-    ofstream my_file("optimal_path.txt");
+void write_to_file(vector < Vector7f > optimal_path){
+    ofstream my_file("../../optimal_path.txt");
     for(int i = 0; i<optimal_path.size();i++){
-        my_file << optimal_path[i].transpose();
+        my_file << optimal_path[i].transpose()<<endl;
     }
     cout<< "Path written to file: optimal_path.txt"<<endl;
     my_file.close();
@@ -123,10 +125,10 @@ T randomCoordinate(T low, T high){
 }
 
 // Returns a random point with some bias towards goal
-VectorXf pickRandomPoint() {
-    VectorXf random_point(num_dim);
+Vector7f pickRandomPoint() {
+    Vector7f random_point;
     float random_sample = randomCoordinate(0.0, 1.0);
-    if((random_sample - GOAL_SAMPLING_PROB) <= EPS and !pathFound) return stop + VectorXf::Constant(num_dim, RADIUS) ;
+    if((random_sample - GOAL_SAMPLING_PROB) <= EPS and !pathFound) return stop + Vector7f::Constant(num_dim, RADIUS) ;
     //fill in random point, might do this in a loop later on
     for(int i = 0;i<num_dim;i++){
         random_point(i) = randomCoordinate(bounds(i,0), bounds(i,1));
@@ -135,39 +137,39 @@ VectorXf pickRandomPoint() {
 }
 
 //Calculate the distance between two points
-float distance(VectorXf a, VectorXf b) {
-    VectorXf c = a-b;
-    return sqrt(c.dot(c));
+float distance(Vector7f a, Vector7f b) {
+    Vector7f c = a-b;
+    return c.norm();
 }
 
 // Very simple steering function: If the distance between two points is too large, a point will be generated
 // along that path max_dist away from the begin point.
-VectorXf steering(VectorXf begin, VectorXf end, float max_dist) {
+Vector7f steering(Vector7f begin, Vector7f end, float max_dist) {
     float dist = distance(begin, end);
-    if ((dist - max_dist)<=EPS){
+    if (dist <= max_dist){
         return end;
     }
     else {
-        VectorXf delta = (end-begin)*max_dist/dist;
+        Vector7f delta = (end-begin)*max_dist/dist;
         return begin+delta;
     }
 }
 
 // Returns true if the line segment ab is obstacle free
-bool isEdgeObstacleFree(VectorXf begin, VectorXf end) {
-    return check_collision_between_two_configurations(begin,end);
+bool isEdgeObstacleFree(Vector7f begin, Vector7f end) {
+    return !check_collision_between_two_configurations(begin,end);
 }
 
 // Returns true of an edge intersects the hypersphere with radius RADIUS around the stop point
 // done by sampling n points on the edge
 void checkDestinationReached() {
-    VectorXf last_node = nodes.back();
-    VectorXf par_last_node = nodes[parent[nodeCnt - 1]];
-    VectorXf direction = last_node-par_last_node;
+    Vector7f last_node = nodes.back();
+    Vector7f par_last_node = nodes[parent[nodeCnt - 1]];
+    Vector7f direction = last_node-par_last_node;
 
     int n = 10;
     for (int i =0; i<n; i++) {
-        VectorXf sample = last_node - i * direction / n;
+        Vector7f sample = last_node - i * direction / n;
         if (distance(sample, stop) < RADIUS) { pathFound = 1; }
     }
     if(pathFound == 1) {
@@ -179,18 +181,18 @@ void checkDestinationReached() {
 /* Inserts nodes on the path from rootIndex till Point q such
    that successive nodes on the path are not more than
    JUMP_SIZE distance away */
-void insertNodesInPath(int rootIndex, VectorXf& q) {
-	VectorXf p = nodes[rootIndex] ;
-	if(!isEdgeObstacleFree(p, q)) return ;
-	while(!(p == q)) {
-		VectorXf nxt = steering(p, q, JUMP_SIZE);
-		nodes.push_back(nxt);
-		parent.push_back(rootIndex);
-		cost.push_back(cost[rootIndex] + distance(p, nxt));
-		rootIndex = nodeCnt++ ;
-		p = nxt ;
-	}
-}
+//void insertNodesInPath(int rootIndex, Vector7f& q) {
+//	Vector7f p = nodes[rootIndex] ;
+//	if(!isEdgeObstacleFree(p, q)) return ;
+//	while(!(p == q)) {
+//		Vector7f nxt = steering(p, q, JUMP_SIZE);
+//		nodes.push_back(nxt);
+//		parent.push_back(rootIndex);
+//		cost.push_back(cost[rootIndex] + distance(p, nxt));
+//		rootIndex = nodeCnt++ ;
+//		p = nxt ;
+//	}
+//}
 
 /*  Rewires the parents of the tree greedily starting from
 	the new node found in this iteration as the parent */
@@ -239,14 +241,15 @@ void ellipse_param(float cbest){
     L = MatrixXf::Identity(num_dim,num_dim)* half_height;
     L(0) = half_width;
 }
+int count_update=0;
 
-VectorXf informed_sampling(){
+Vector7f informed_sampling(){
     // compute the intervals, every thing above can be preemptively calculated
-    VectorXf x_tf(num_dim);
+    Vector7f x_tf;
     bool ok_point = false;
     while(!ok_point) {
         //Transform the random point via translation and rotation
-        VectorXf x_random = VectorXf::Random(num_dim);
+        Vector7f x_random = Vector7f::Random(num_dim);
         x_tf = C*L*x_random + center;
 
         // check if within bounds for all
@@ -265,7 +268,7 @@ VectorXf informed_sampling(){
 /*	Runs one iteration of RRT depending on user choice
 	At least one new node is added on the screen each iteration. */
 void RRT() {
-	VectorXf newPoint(num_dim), nearestPoint(num_dim), nextPoint(num_dim) ; bool updated = false ; int cnt = 0 ;
+	Vector7f newPoint, nearestPoint, nextPoint ; bool updated = false ;
 	int nearestIndex = 0 ; float minCost = INF; nearby.clear(); jumps.resize(nodeCnt);
 
 	while(!updated) {
@@ -292,7 +295,7 @@ void RRT() {
 
             // Make smaller jumps sometimes to facilitate passing through narrow passages
             jumps[i] = randomCoordinate(0.3, 1.0) * JUMP_SIZE;
-            auto pnt = nodes[i];
+            Vector7f pnt = nodes[i];
             if ((distance(pnt, newPoint) - distance(nearestPoint, newPoint)) <= EPS and
                 isEdgeObstacleFree(pnt, steering(pnt, newPoint, jumps[i])))
                 nearestPoint = pnt, nearestIndex = i;
@@ -303,6 +306,7 @@ void RRT() {
         if (!pathFound) {
             // This is where we don't do any RRT* optimization part
             updated = true;
+            count_update++;
             nodes.push_back(nextPoint);
             nodeCnt++;
             parent.push_back(nearestIndex);
@@ -334,38 +338,46 @@ void RRT() {
 }
 
 int main() {
-//    int data_ok = load_pointcloud_data ("./scene3_filtered.xyz");
-    int data_ok = 0;
-
     if (data_ok == 1){return 1;}
 
     else {
+        start = Vector7f::Constant(num_dim, 0);
+        stop = Vector7f::Constant(num_dim, 0);stop(0) = 3; stop(1)=10;
+
         nodeCnt = 1;
         nodes.push_back(start);
         int iterations = 0;
         parent.push_back(0);
         cost.push_back(0);
+        bool done = false;
 
-        while (iterations < max_iterations) {
+        while (iterations < max_iterations and !pathFound) { // Is purely for testing, for actual use you should not stop once a path has been found
             RRT();
             iterations++;
 
             if (iterations % 500 == 0) {
-                cout << "Iterations: " << iterations << endl;
-                if (!pathFound) cout << "Not reached yet :( " << endl;
+                cout << "Number of iterations: " << iterations << endl;
+                if (!pathFound) cout << "Not reached yet" << endl;
                 else cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
                 cout << endl;
             }
 
         }
         cout << "Number of iterations: " << iterations << endl;
-        if (!pathFound) cout << "Path not reached yet :( " << endl;
-        else cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
-
-        vector<VectorXf> optimal_path = get_path();
-        write_to_file(optimal_path);
+        if (!pathFound) cout << "Goal not reached within max iterations :( " << endl;
+        else {
+            cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
+            vector<Vector7f> optimal_path = get_path();
+            write_to_file(optimal_path);
+        }
     }
 
 }
 
-
+//int main(){
+//    while (true) {
+//        start = pickRandomPoint();
+//        if (isEdgeObstacleFree(start, start)):
+//        cout << isEdgeObstacleFree(start, start) << endl;
+//    }
+//}
