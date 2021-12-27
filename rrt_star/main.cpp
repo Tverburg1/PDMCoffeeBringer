@@ -20,12 +20,23 @@ const int max_iterations = 10000;
 const float RADIUS = 1.5 ; // Radius of region around the goal point for which success is defined
 const float GOAL_SAMPLING_PROB = 0.05;
 const float INF = 1e18;
-
-//Load the point cloud in vector<coordinate_3d> point_cloud_environment
-
 using Vector7f = Matrix<float, 7, 1> ;
 
-// Function that obtains the maximum and minimum x and y values
+// Function for making a top-down projection of the point cloud for visualisation
+vector<Vector2f> project_2d(vector<coordinate_3d> point_cloud){
+    vector<Vector2f> points;
+    for(int i=0;i<point_cloud.size();i++) {
+        if (point_cloud[i].z_ < 0.5*1.1 and point_cloud[i].z_>0.5*0.9){
+            float x = point_cloud[i].x_;
+            float y = point_cloud[i].y_;
+            Vector2f point; point << x, y;
+            points.push_back(point);
+        }
+    }
+    return points;
+}
+
+// Function that obtains the maximum and minimum x and y values from point cloud
 vector<float> get_min_max_pc(vector<coordinate_3d> point_cloud){
     float xmax, ymax = -INF;
     float xmin, ymin = INF;
@@ -123,6 +134,23 @@ T randomCoordinate(T low, T high){
     mt19937 engine{random_device()};
     uniform_real_distribution<float> dist(low, high);
     return dist(engine);
+}
+// returns a vector of indices of the given array in descending order
+//source: https://stackoverflow.com/questions/1577475/c-sorting-and-keeping-track-of-indexes
+template <typename T>
+vector<size_t> sort_indexes(const vector<T> &v) {
+
+    // initialize original index locations
+    vector<size_t> idx(v.size());
+    iota(idx.begin(), idx.end(), 0);
+
+    // sort indexes based on comparing values in v
+    // using std::stable_sort instead of std::sort
+    // to avoid unnecessary index re-orderings
+    // when v contains elements of equal values
+    stable_sort(idx.begin(), idx.end(),
+                [&v](size_t i1, size_t i2) {return v[i1] < v[i2];});
+    return idx;
 }
 
 // Returns a random point with some bias towards goal
@@ -242,7 +270,6 @@ void ellipse_param(float cbest){
     L = MatrixXf::Identity(num_dim,num_dim)* half_height;
     L(0) = half_width;
 }
-int count_update=0;
 
 Vector7f informed_sampling(){
     // compute the intervals, every thing above can be preemptively calculated
@@ -290,24 +317,34 @@ void RRT() {
         // be added in graph in the (nearestPoint, newPoint) while being obstacle free
         nearestPoint = *nodes.begin();
         nearestIndex = 0;
+
+        vector<float> distances(nodeCnt); // vector for storing the distances between points
         for (int i = 0; i < nodeCnt; i++) {
             if (pathFound and randomCoordinate(0.0, 1.0) < 0.25) // Recalculate cost once in a while
                 cost[i] = cost[parent[i]] + distance(nodes[parent[i]], nodes[i]);
 
             // Make smaller jumps sometimes to facilitate passing through narrow passages
             jumps[i] = randomCoordinate(0.3, 1.0) * JUMP_SIZE;
-            Vector7f pnt = nodes[i];
-            if ((distance(pnt, newPoint) - distance(nearestPoint, newPoint)) <= EPS and
-                isEdgeObstacleFree(pnt, steering(pnt, newPoint, jumps[i])))
-                nearestPoint = pnt, nearestIndex = i;
+
+            //save distances between newPoint and each node
+            distances[i] = distance(newPoint, nodes[i]);
         }
+        // take the sorted distances and check for the closest node if a collision free edge can be created
+        // if not go on to the next, if so break the loop and continue on
+        for (auto i: sort_indexes(distances)) {
+            Vector7f pnt = nodes[i];
+            if (isEdgeObstacleFree(pnt, steering(pnt, newPoint, jumps[i]))) {
+                nearestPoint = pnt, nearestIndex = i;
+                break;
+            }
+        }
+
         nextPoint = steering(nearestPoint, newPoint, jumps[nearestIndex]);
         if (!isEdgeObstacleFree(nearestPoint, nextPoint)) continue;
 
         if (!pathFound) {
             // This is where we don't do any RRT* optimization part
             updated = true;
-            count_update++;
             nodes.push_back(nextPoint);
             nodeCnt++;
             parent.push_back(nearestIndex);
@@ -316,6 +353,7 @@ void RRT() {
             continue;
         }
 
+        // This section should only be reachable when the path IS found. This is RRT*
         // Find nearby nodes to the new node within radius optimal radius opt_r (function of DISK SIZE) of the new node
         for (int i = 0; i < nodeCnt; i++) {
             float opt_r = DISK_SIZE * pow((log(nodeCnt) / nodeCnt), 1 / (num_dim + 1));
@@ -333,12 +371,13 @@ void RRT() {
 		parent.push_back(par); cost.push_back(minCost);
 		nodes.push_back(nextPoint); nodeCnt++; sampled_nodes.push_back(nextPoint);
 		updated = true ;
-		if(!pathFound) checkDestinationReached();
+
 		rewire();
 	}
 }
 
 int main() {
+    //Load the point cloud in vector<coordinate_3d> point_cloud_environment
     int data_ok = load_pointcloud_data ("../../collision_checks/pointcloud/scene3_filtered.xyz");
     if (data_ok == 1){return 1;}
 
@@ -379,13 +418,3 @@ int main() {
 
 }
 
-//int main(){
-//    int data_ok = load_pointcloud_data ("../../collision_checks/pointcloud/scene3_filtered.xyz");
-//    cout<<point_cloud_environment.size()<<endl;
-//    start = Vector7f::Constant(num_dim, 0);start(0) = 2.18493; start(1)=11.3092;
-//    stop = Vector7f::Constant(num_dim, 0);stop(0) = 2.5232; stop(1)=11.357;
-//
-//
-//    cout << isEdgeObstacleFree(start, stop) << endl;
-//
-//}
