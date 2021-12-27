@@ -4,6 +4,7 @@
 #include <random>
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/SVD>
+#include <SFML/Graphics.hpp>
 // include the files for collision
 #include "collision_check.h"
 #include "load_pointcloud.h"
@@ -11,6 +12,7 @@
 
 using namespace std ;
 using namespace Eigen;
+
 
 const float EPS = 1e-6;
 
@@ -35,6 +37,7 @@ vector<Vector2f> project_2d(vector<coordinate_3d> point_cloud){
     }
     return points;
 }
+vector<Vector2f> proj_pc_points;
 
 // Function that obtains the maximum and minimum x and y values from point cloud
 vector<float> get_min_max_pc(vector<coordinate_3d> point_cloud){
@@ -116,6 +119,83 @@ vector < Vector7f > get_path(){
     // reverse the order of nodes to obtain list from start to stop
     reverse(optimal_path.begin(), optimal_path.end());
     return optimal_path;
+}
+
+// width and height of plotting windows
+int scaling_factor = 30;
+int WIDTH;
+int HEIGHT;
+
+sf::Vector2f CV(VectorXf configuration){
+    sf::Vector2f output;
+
+    output.x = (configuration(0)-bounds_2d[0])*scaling_factor;
+    output.y = HEIGHT-(configuration(1)-bounds_2d[2])*scaling_factor; //this is so that the y-axis points up
+    return output;
+}
+
+void draw(sf::RenderWindow& window) {
+    sf::Vertex line[2]; sf::CircleShape nodeCircle; sf::CircleShape pc_circle;
+
+    // Uncomment if circular nodes are to be drawn
+    for(auto& node: nodes) {
+        nodeCircle.setRadius(RADIUS/2.5); // nodeCircle.setRadius(min(2.0, RADIUS/2.0));
+        nodeCircle.setOrigin(RADIUS/2.5, RADIUS/2.5);
+        nodeCircle.setFillColor(sf::Color(0, 255, 171)); nodeCircle.setPosition(CV(node));
+        window.draw(nodeCircle);
+    }
+
+    // Draw obstacles
+    for(auto& point: proj_pc_points){
+        pc_circle.setRadius(RADIUS/2.5); // nodeCircle.setRadius(min(2.0, RADIUS/2.0));
+        pc_circle.setOrigin(RADIUS/2.5, RADIUS/2.5);
+        pc_circle.setFillColor(sf::Color::Yellow); pc_circle.setPosition(CV(point));
+        window.draw(pc_circle);
+    }
+    // Draw edges between nodes
+    for(int i = (int)nodes.size() - 1; i; i--) {
+        Vector7f par = nodes[parent[i]] ;
+        line[0] = sf::Vertex(sf::Vector2f(CV(par)));
+        line[1] = sf::Vertex(sf::Vector2f(CV(nodes[i])));
+        window.draw(line, 2, sf::Lines);
+    }
+    // draw start point and stop point
+    sf::CircleShape startingPoint, endingPoint ;
+    startingPoint.setRadius(RADIUS); endingPoint.setRadius(RADIUS);
+    startingPoint.setFillColor(sf::Color::Green); endingPoint.setFillColor(sf::Color::Magenta);
+    startingPoint.setPosition(CV(start)); endingPoint.setPosition(CV(stop));
+    startingPoint.setOrigin(RADIUS/2, RADIUS/2); endingPoint.setOrigin(RADIUS/2, RADIUS/2);
+
+    window.draw(startingPoint); window.draw(endingPoint);
+
+    // If destination is reached then path is retraced and drawn
+    if(pathFound) {
+        int node = goalIndex;
+        while(parent[node] != node) {
+            int par = parent[node];
+            line[0] = sf::Vertex(CV(nodes[par]));
+            line[1] = sf::Vertex(CV(nodes[node]));
+            line[0].color = line[1].color = sf::Color::Red; // orange color
+            window.draw(line, 2, sf::Lines);
+            node = par ;
+        }
+
+        //draw ellipse
+            sf::CircleShape ellipse;
+            ellipse.setRadius(1);
+            ellipse.setOrigin(1,1);
+            ellipse.setScale(half_width*scaling_factor, half_height*0.5*scaling_factor);
+            ellipse.setOutlineColor(sf::Color::Yellow);
+            ellipse.setOutlineThickness(0.008);
+            ellipse.setFillColor(sf::Color::Transparent);
+
+
+            double angle = (atan2(midline(0),midline(1))- M_PI/2 )/ M_PI*180 + 90;
+            ellipse.move(CV(center));
+            ellipse.rotate(angle);
+
+            window.draw(ellipse);
+    }
 }
 
 void write_to_file(vector < Vector7f > optimal_path){
@@ -378,35 +458,54 @@ void RRT() {
 
 int main() {
     //Load the point cloud in vector<coordinate_3d> point_cloud_environment
-    int data_ok = load_pointcloud_data ("../../collision_checks/pointcloud/scene3_filtered.xyz");
-    if (data_ok == 1){return 1;}
+    int data_ok = load_pointcloud_data("../../collision_checks/pointcloud/scene3_filtered.xyz");
+    if (data_ok == 1) { return 1; }
 
     else {
         bounds_2d = get_min_max_pc(point_cloud_environment);
         bounds = get_bounds();
+        proj_pc_points = project_2d(point_cloud_environment);
+        WIDTH = (bounds_2d[1]-bounds_2d[0]+2)*scaling_factor;
+        HEIGHT = (bounds_2d[3]-bounds_2d[2]+2)*scaling_factor;
+        sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "Basic Anytime RRT");
 
         start = Vector7f::Constant(num_dim, 0);
-        stop = Vector7f::Constant(num_dim, 0);stop(0) = 3; stop(1)=10;
+        stop = Vector7f::Constant(num_dim, 0);
+        stop(0) = 3;
+        stop(1) = 10;
 
         nodeCnt = 1;
         nodes.push_back(start);
         int iterations = 0;
         parent.push_back(0);
         cost.push_back(0);
-        bool done = false;
 
-        while (iterations < max_iterations and !pathFound) { // Is purely for testing, for actual use you should not stop once a path has been found
+        cout << endl << "Starting node is in Pink and Destination node is in Blue" << endl << endl;
+        while (window.isOpen()) {
+            sf::Event event;
+            while (window.pollEvent(event)) {
+                if (event.type == sf::Event::Closed) {
+                    window.close();
+                    return 0;
+                    exit(0);
+                }
+            }
             RRT();
             iterations++;
 
-            if (iterations % 10 == 0) {
-                cout << "Number of iterations: " << iterations << endl;
-                if (!pathFound) cout << "Not reached yet" << endl;
+            if (iterations % 10 == 0 and iterations < max_iterations) {
+                cout << "Iterations: " << iterations << endl;
+                if (!pathFound) cout << "Not reached yet :( " << endl;
                 else cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
                 cout << endl;
             }
 
+            //sf::sleep(delayTime);
+            window.clear();
+            draw(window);
+            window.display();
         }
+
         cout << "Number of iterations: " << iterations << endl;
         if (!pathFound) cout << "Goal not reached within max iterations :( " << endl;
         else {
@@ -414,7 +513,30 @@ int main() {
             vector<Vector7f> optimal_path = get_path();
             write_to_file(optimal_path);
         }
-    }
 
+    }
 }
+//
+//        while (iterations < max_iterations and !pathFound) { // Is purely for testing, for actual use you should not stop once a path has been found
+//            RRT();
+//            iterations++;
+//
+//            if (iterations % 10 == 0) {
+//                cout << "Number of iterations: " << iterations << endl;
+//                if (!pathFound) cout << "Not reached yet" << endl;
+//                else cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
+//                cout << endl;
+//            }
+//
+//        }
+//        cout << "Number of iterations: " << iterations << endl;
+//        if (!pathFound) cout << "Goal not reached within max iterations :( " << endl;
+//        else {
+//            cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
+//            vector<Vector7f> optimal_path = get_path();
+//            write_to_file(optimal_path);
+//        }
+//    }
+//
+//}
 
