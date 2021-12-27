@@ -17,12 +17,12 @@ const float EPS = 1e-6;
 const int num_dim = 7;
 const int max_iterations = 10000;
 
-const float RADIUS = 1 ; // Radius of region around the goal point for which success is defined
+const float RADIUS = 1.5 ; // Radius of region around the goal point for which success is defined
 const float GOAL_SAMPLING_PROB = 0.05;
 const float INF = 1e18;
 
 //Load the point cloud in vector<coordinate_3d> point_cloud_environment
-int data_ok = load_pointcloud_data ("../../collision_checks/pointcloud/scene3_filtered.xyz");
+
 using Vector7f = Matrix<float, 7, 1> ;
 
 // Function that obtains the maximum and minimum x and y values
@@ -42,8 +42,9 @@ vector<float> get_min_max_pc(vector<coordinate_3d> point_cloud){
     vector<float> bounds_2d{xmin,xmax,ymin,ymax};
     return bounds_2d;
 }
-vector<float> bounds_2d = get_min_max_pc(point_cloud_environment);
-//vector<float> bounds_2d{0,800,0,600};
+//vector<float> bounds_2d = get_min_max_pc(point_cloud_environment);
+//vector<float> bounds_2d{-10.4, 6.13,-4.68,18.31};
+vector<float> bounds_2d;
 
 // The bounds of the dimensions of the configuration space should be defined here
 
@@ -60,9 +61,9 @@ MatrixXf get_bounds(){
 
     return bounds;
 }
-MatrixXf bounds = get_bounds();
+MatrixXf bounds;
 
-Vector7f diff = bounds.col(1)-bounds.col(0);
+//Vector7f diff = bounds.col(1)-bounds.col(0);
 //float JUMP_SIZE = diff.sum()/(pow(100.0,num_dim)); // same as before but now generalized
 float JUMP_SIZE = 0.5;
 float DISK_SIZE = JUMP_SIZE ; // Ball radius around which nearby points are found
@@ -338,9 +339,13 @@ void RRT() {
 }
 
 int main() {
+    int data_ok = load_pointcloud_data ("../../collision_checks/pointcloud/scene3_filtered.xyz");
     if (data_ok == 1){return 1;}
 
     else {
+        bounds_2d = get_min_max_pc(point_cloud_environment);
+        bounds = get_bounds();
+
         start = Vector7f::Constant(num_dim, 0);
         stop = Vector7f::Constant(num_dim, 0);stop(0) = 3; stop(1)=10;
 
@@ -355,7 +360,7 @@ int main() {
             RRT();
             iterations++;
 
-            if (iterations % 500 == 0) {
+            if (iterations % 10 == 0) {
                 cout << "Number of iterations: " << iterations << endl;
                 if (!pathFound) cout << "Not reached yet" << endl;
                 else cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
@@ -375,9 +380,12 @@ int main() {
 }
 
 //int main(){
-//    while (true) {
-//        start = pickRandomPoint();
-//        if (isEdgeObstacleFree(start, start)):
-//        cout << isEdgeObstacleFree(start, start) << endl;
-//    }
+//    int data_ok = load_pointcloud_data ("../../collision_checks/pointcloud/scene3_filtered.xyz");
+//    cout<<point_cloud_environment.size()<<endl;
+//    start = Vector7f::Constant(num_dim, 0);start(0) = 2.18493; start(1)=11.3092;
+//    stop = Vector7f::Constant(num_dim, 0);stop(0) = 2.5232; stop(1)=11.357;
+//
+//
+//    cout << isEdgeObstacleFree(start, stop) << endl;
+//
 //}
