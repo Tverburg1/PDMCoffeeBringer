@@ -149,7 +149,7 @@ void draw(sf::RenderWindow& window) {
     for(auto& point: proj_pc_points){
         pc_circle.setRadius(RADIUS/2.5); // nodeCircle.setRadius(min(2.0, RADIUS/2.0));
         pc_circle.setOrigin(RADIUS/2.5, RADIUS/2.5);
-        pc_circle.setFillColor(sf::Color::Yellow); pc_circle.setPosition(CV(point));
+        pc_circle.setFillColor(sf::Color(125,125,125)); pc_circle.setPosition(CV(point));
         window.draw(pc_circle);
     }
     // Draw edges between nodes
@@ -458,7 +458,7 @@ void RRT() {
 
 int main() {
     //Load the point cloud in vector<coordinate_3d> point_cloud_environment
-    int data_ok = load_pointcloud_data("../../collision_checks/pointcloud/scene3_filtered.xyz");
+    int data_ok = load_pointcloud_data("../../collision_checks/pointcloud/pc_edit.xyz");
     if (data_ok == 1) { return 1; }
 
     else {
@@ -480,14 +480,12 @@ int main() {
         parent.push_back(0);
         cost.push_back(0);
 
-        cout << endl << "Starting node is in Pink and Destination node is in Blue" << endl << endl;
+        cout << endl << "Starting node is in Green and Destination node is in Magenta" << endl << endl;
         while (window.isOpen()) {
             sf::Event event;
             while (window.pollEvent(event)) {
                 if (event.type == sf::Event::Closed) {
                     window.close();
-                    return 0;
-                    exit(0);
                 }
             }
             RRT();
@@ -507,7 +505,7 @@ int main() {
         }
 
         cout << "Number of iterations: " << iterations << endl;
-        if (!pathFound) cout << "Goal not reached within max iterations :( " << endl;
+        if (!pathFound) cout << "Goal not reached within max iterations or manual termination " << endl;
         else {
             cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
             vector<Vector7f> optimal_path = get_path();
