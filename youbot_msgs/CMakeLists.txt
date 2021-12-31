@@ -11,6 +11,7 @@ add_message_files(
     FILES
     Control.msg
     ControlSettings.msg
+    BaseControlSettings.msg
 )
 
 generate_messages(
