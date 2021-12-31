@@ -30,7 +30,9 @@ include_directories(
 ## Declare a C++ executable
 add_executable(youbot_motion_controller_node src/youbot_motion_controller_node.cpp src/youbot_motion_controller.cpp)
 add_executable(youbot_configuration_publisher_node src/youbot_configuration_publisher_node.cpp src/youbot_motion_controller.cpp)
+add_executable(youbot_configuration_reader src/youbot_configuration_reader.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(youbot_motion_controller_node ${catkin_LIBRARIES})
 target_link_libraries(youbot_configuration_publisher_node ${catkin_LIBRARIES})
+target_link_libraries(youbot_configuration_reader ${catkin_LIBRARIES})
