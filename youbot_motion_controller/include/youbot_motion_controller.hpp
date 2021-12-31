@@ -5,7 +5,7 @@
 #include <trajectory_msgs/JointTrajectory.h>
 #include <geometry_msgs/Twist.h>
 #include <youbot_msgs/Control.h>
-#include <youbot_msgs/ControlSettings.h>
+#include <youbot_msgs/BaseControlSettings.h>
 #include <gazebo_msgs/GetLinkState.h>
 #include <gazebo_msgs/GetModelState.h>
 #include <gazebo_msgs/GetJointProperties.h>
@@ -39,7 +39,8 @@ public:
 
     Eigen::VectorXf get_travel_time(const Eigen::VectorXf &config1, const Eigen::VectorXf &config2);
 
-    float k_pos = 100, k_vel = 300, k_exp_vel = 10;
+//    Eigen::Matrix3f k_pos, k_vel, k_exp_vel;
+    Eigen::Array3f brake_distance, k_pos, k_vel;
 
 private:
     ros::NodeHandle nh_;
@@ -50,7 +51,7 @@ private:
 
     void control_callback(const youbot_msgs::Control &control_msg);
 
-    void set_controller_callback(const youbot_msgs::ControlSettings &msg);
+    void set_controller_callback(const youbot_msgs::BaseControlSettings &msg);
 
     Eigen::Vector3f get_base_velocity_from_force(Eigen::Vector3f &force) const;
 

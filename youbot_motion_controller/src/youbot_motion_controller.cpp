@@ -2,8 +2,8 @@
 
 YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_handle, float dt) : nh_(
         private_node_handle), dt(dt) {
-    sub_config_ = nh_.subscribe("/youbot/control", 1, &YouBotMotionController::control_callback, this);
-    sub_pid_ = nh_.subscribe("/youbot/base/set_controller", 1, &YouBotMotionController::set_controller_callback, this);
+    sub_config_ = nh_.subscribe("/youbot/control", 1000, &YouBotMotionController::control_callback, this);
+    sub_pid_ = nh_.subscribe("/youbot/base/set_controller", 10, &YouBotMotionController::set_controller_callback, this);
     pub_base_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 100);
     pub_arm_ = nh_.advertise<trajectory_msgs::JointTrajectory>("/arm_1/arm_controller/command", 100);
     base_position_client_ = nh_.serviceClient<gazebo_msgs::GetLinkState>("/gazebo/get_link_state");
@@ -29,16 +29,21 @@ YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_han
     v_current.setZero();
 
     arm_on_its_way = false;
+
+    k_pos << 10000, 10000, 5000;
+    k_vel << 3000, 3000, 3000;
+    brake_distance << 0.2, 0.2, 0.3;
 }
 
-void YouBotMotionController::set_controller_callback(const youbot_msgs::ControlSettings &msg) {
-    k_pos = msg.k_pos;
-    k_vel = msg.k_vel;
-    k_exp_vel = msg.k_exp_vel;
+void YouBotMotionController::set_controller_callback(const youbot_msgs::BaseControlSettings &msg) {
+    k_pos = Eigen::Array3f{msg.linear.k_pos, msg.linear.k_pos, msg.orientation.k_pos};
+    k_vel = Eigen::Array3f{msg.linear.k_vel, msg.linear.k_vel, msg.orientation.k_vel};
+    brake_distance = Eigen::Array3f{msg.linear.brake_distance, msg.linear.brake_distance, msg.orientation.brake_distance};
     v_current.setZero();
 }
 
 void YouBotMotionController::control_callback(const youbot_msgs::Control &control_msg) {
+    ROS_INFO_STREAM("Received a new configuration");
     Eigen::VectorXf configuration(8);
     configuration(0) = control_msg.X;
     configuration(1) = control_msg.Y;
@@ -87,8 +92,9 @@ void YouBotMotionController::move_base_towards_position(Eigen::Vector3f position
     Eigen::Vector3f current_pos = get_current_configuration().head<3>();
     Eigen::Vector3f dist = position - current_pos;
     Eigen::AngleAxis<float> t(current_pos(2), Eigen::Vector3f(0, 0, 1));
-//    F = k_pos * x - k_vel * e^{-k_exp_vel * |x|} * v
-    Eigen::Vector3f force = t.inverse() * dist * k_pos - k_vel * std::exp(-k_exp_vel * dist.norm()) * v_current;
+//    F = k_pos * x - k_vel * e^(-k_exp_vel * x) * v
+    Eigen::Array3f brake_select = (brake_distance > dist.cwiseAbs().array()).cast<float>();
+    Eigen::Vector3f force = k_pos * (t.inverse() * dist).array() - k_vel * brake_select * v_current.array();
     apply_force_on_base(force);
 }
 
@@ -122,13 +128,14 @@ Eigen::Vector3f YouBotMotionController::get_base_velocity_from_force(Eigen::Vect
 }
 
 void YouBotMotionController::brake() {
+    geometry_msgs::Twist base_msg;
     if ((v_current.array() == 0).all()) {
+        pub_base_.publish(base_msg);
         return;
     }
     Eigen::Vector3f F_opposite = -1000 * v_current;
     Eigen::Vector3f v_min = get_base_velocity_from_force(F_opposite);
     if ((v_current.cwiseProduct(v_min).array() < 0).all()) {
-        geometry_msgs::Twist base_msg;
         pub_base_.publish(base_msg);
         v_current.setZero();
     } else {
@@ -138,14 +145,16 @@ void YouBotMotionController::brake() {
 
 void YouBotMotionController::process_configs() {
     if (config_to_go_.empty()) {
+        ROS_INFO_STREAM("No configuration found, breaking");
         brake();
         return;
     }
 
     Eigen::VectorXf config_goal = config_to_go_.front();
     Eigen::VectorXf config_current = get_current_configuration();
-
+    ROS_INFO_STREAM("Distance to configuration goal: " << (config_goal - config_current).norm());
     if ((config_goal - config_current).norm() < 0.01) { // Configuration reached
+        ROS_INFO_STREAM("Reached configuration, number configurations to go: " << config_to_go_.size());
         previous_config_ = config_goal;
         config_to_go_.pop();
         arm_on_its_way = false;

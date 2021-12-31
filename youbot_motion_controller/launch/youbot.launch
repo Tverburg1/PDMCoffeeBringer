@@ -30,6 +30,6 @@
     <param name="publish_frequency" type="double" value="100.0" />
   </node>
 
-  <node pkg="youbot_motion_controller" type="youbot_motion_controller_node" name="youbot_motion_controller_node"/>
+  <node pkg="youbot_motion_controller" type="youbot_motion_controller_node" name="youbot_motion_controller_node" output="screen"/>
 
 </launch>

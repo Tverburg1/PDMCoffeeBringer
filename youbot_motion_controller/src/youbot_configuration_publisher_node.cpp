@@ -20,6 +20,7 @@ int main(int argc, char *argv[]) {
         msg.joint_4 = config(6);
         msg.joint_5 = config(7);
         pub.publish(msg);
+        ros::spinOnce();
         rate.sleep();
     }
 }
