@@ -17,12 +17,57 @@ using namespace Eigen;
 const float EPS = 1e-6;
 
 const int num_dim = 7;
-const int max_iterations = 10000;
+int max_iterations = 10000;
 
-const float RADIUS = 1.5 ; // Radius of region around the goal point for which success is defined
+float RADIUS = 1.5 ; // Radius of region around the goal point for which success is defined
 const float GOAL_SAMPLING_PROB = 0.05;
 const float INF = 1e18;
 using Vector7f = Matrix<float, 7, 1> ;
+
+float JUMP_SIZE = 0.5;
+float DISK_SIZE = JUMP_SIZE ; // Ball radius around which nearby points are found
+
+int scaling_factor = 30; //scaling for plotting window
+
+Vector7f start(num_dim), stop(num_dim) ;
+// Get input
+template <typename T>
+void redefine(string title, T &variable){
+    float answer=0;
+    cout << title<< ":" <<endl;
+    cin>> answer;
+    if (answer){variable=answer;}
+    else {cout<<"default used: "<< variable <<endl;}
+}
+
+void getInput() {
+    float answer;
+    cout << "Select here parameters for running the code. "
+            "If you input 0 default values will be used" << endl<<endl; ;
+
+    cout << "redefine start? (1 for yes, 0 for no)"<<endl;
+    cin>> answer;
+    if (answer){
+        cout << "Input start configuration (input 7 numbers separated by spaces)" <<endl;
+        cin >> start(0)>>start(1)>>start(2)>>start(3)>>start(4)>>start(5)>>start(6);
+    }
+
+    cout << "redefine stop? (1 for yes, 0 for no)"<<endl;
+    cin>> answer;
+    if (answer){
+        cout << "Input stop configuration (input 7 numbers separated by spaces)" <<endl;
+        cin >> stop(0)>>stop(1)>>stop(2)>>stop(3)>>stop(4)>>stop(5)>>stop(6);
+    }
+
+    cout << "redefine other parameters? (1 for yes, 0 for no)"<<endl;
+    cin>> answer;
+    if (answer){
+        redefine("Goal Radius", RADIUS);
+        redefine("Maximum jump distance", JUMP_SIZE);
+        redefine("Radius around which nearby points are found", DISK_SIZE);
+        redefine("Maximum iterations", max_iterations);
+    }
+}
 
 // Function for making a top-down projection of the point cloud for visualisation
 vector<Vector2f> project_2d(vector<coordinate_3d> point_cloud){
@@ -79,10 +124,7 @@ MatrixXf bounds;
 
 //Vector7f diff = bounds.col(1)-bounds.col(0);
 //float JUMP_SIZE = diff.sum()/(pow(100.0,num_dim)); // same as before but now generalized
-float JUMP_SIZE = 0.5;
-float DISK_SIZE = JUMP_SIZE ; // Ball radius around which nearby points are found
 
-Vector7f start(num_dim), stop(num_dim) ;
 
 vector < Vector7f > nodes;
 vector < int > parent, nearby ;
@@ -122,7 +164,6 @@ vector < Vector7f > get_path(){
 }
 
 // width and height of plotting windows
-int scaling_factor = 30;
 int WIDTH;
 int HEIGHT;
 
@@ -462,17 +503,20 @@ int main() {
     if (data_ok == 1) { return 1; }
 
     else {
+        // some default values for start and stop, can be changed further on
+        start = Vector7f::Constant(num_dim, 0);
+        stop = Vector7f::Constant(num_dim, 0);
+        stop(0) = 3;
+        stop(1) = 10;
+
+        getInput();
+
         bounds_2d = get_min_max_pc(point_cloud_environment);
         bounds = get_bounds();
         proj_pc_points = project_2d(point_cloud_environment);
         WIDTH = (bounds_2d[1]-bounds_2d[0]+2)*scaling_factor;
         HEIGHT = (bounds_2d[3]-bounds_2d[2]+2)*scaling_factor;
         sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "Basic Anytime RRT");
-
-        start = Vector7f::Constant(num_dim, 0);
-        stop = Vector7f::Constant(num_dim, 0);
-        stop(0) = 3;
-        stop(1) = 10;
 
         nodeCnt = 1;
         nodes.push_back(start);
@@ -481,7 +525,7 @@ int main() {
         cost.push_back(0);
 
         cout << endl << "Starting node is in Green and Destination node is in Magenta" << endl << endl;
-        while (window.isOpen()) {
+        while (window.isOpen() and iterations < max_iterations) {
             sf::Event event;
             while (window.pollEvent(event)) {
                 if (event.type == sf::Event::Closed) {
@@ -491,7 +535,7 @@ int main() {
             RRT();
             iterations++;
 
-            if (iterations % 10 == 0 and iterations < max_iterations) {
+            if (iterations % 10 == 0) {
                 cout << "Iterations: " << iterations << endl;
                 if (!pathFound) cout << "Not reached yet :( " << endl;
                 else cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
