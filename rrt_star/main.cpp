@@ -19,8 +19,9 @@ const float EPS = 1e-6;
 const int num_dim = 7;
 int max_iterations = 10000;
 
-float RADIUS = 1.5 ; // Radius of region around the goal point for which success is defined
-const float GOAL_SAMPLING_PROB = 0.05;
+
+float RADIUS = 1.0 ; // Radius of region around the goal point for which success is defined
+const float GOAL_SAMPLING_PROB = 0.10;
 const float INF = 1e18;
 using Vector7f = Matrix<float, 7, 1> ;
 
@@ -29,7 +30,7 @@ float DISK_SIZE = JUMP_SIZE ; // Ball radius around which nearby points are foun
 
 int scaling_factor = 30; //scaling for plotting window
 
-Vector7f start(num_dim), stop(num_dim) ;
+Vector7f start, stop ;
 // Get input
 template <typename T>
 void redefine(string title, T &variable){
@@ -107,20 +108,20 @@ vector<float> bounds_2d;
 
 // The bounds of the dimensions of the configuration space should be defined here
 
-MatrixXf get_bounds(){
-    MatrixXf bounds(num_dim, 2);
+Matrix<float, num_dim, 2> get_bounds(){
+    Matrix<float, num_dim, 2> bounds;
     bounds <<
         bounds_2d[0], bounds_2d[1],
         bounds_2d[2], bounds_2d[3] ,
-        0.0, 2 * M_PI ,
-        -169 / 180 * M_PI, 169 / 180 * M_PI ,
-         -65 / 180 * M_PI, 90 / 180 * M_PI ,
-        -146 / 180 * M_PI, 150 / 180 * M_PI ,
-        -102.5 / 180 * M_PI, 102.5 / 180 * M_PI;
+        0.0, (2 * M_PI) ,
+        (-169.0/180*M_PI), (169.0/180*M_PI ),
+        (-65.0 / 180 * M_PI), (90.0 / 180 * M_PI) ,
+        (-146.0 / 180 * M_PI), (150.0 / 180 * M_PI) ,
+        (-102.5 / 180 * M_PI), (102.5 / 180 * M_PI);
 
     return bounds;
 }
-MatrixXf bounds;
+Matrix<float, num_dim, 2> bounds;
 
 //Vector7f diff = bounds.col(1)-bounds.col(0);
 //float JUMP_SIZE = diff.sum()/(pow(100.0,num_dim)); // same as before but now generalized
@@ -211,31 +212,39 @@ void draw(sf::RenderWindow& window) {
 
     // If destination is reached then path is retraced and drawn
     if(pathFound) {
-        int node = goalIndex;
-        while(parent[node] != node) {
-            int par = parent[node];
-            line[0] = sf::Vertex(CV(nodes[par]));
-            line[1] = sf::Vertex(CV(nodes[node]));
+        vector < Vector7f > path = get_path();
+        for(int i = 1; i< path.size(); i++){
+            line[0] = sf::Vertex(CV(path[i-1]));
+            line[1] = sf::Vertex(CV(path[i]));
             line[0].color = line[1].color = sf::Color::Red; // orange color
             window.draw(line, 2, sf::Lines);
-            node = par ;
         }
 
+//        int node = goalIndex;
+//        while(parent[node] != node) {
+//            int par = parent[node];
+//            line[0] = sf::Vertex(CV(nodes[par]));
+//            line[1] = sf::Vertex(CV(nodes[node]));
+//            line[0].color = line[1].color = sf::Color::Red; // orange color
+//            window.draw(line, 2, sf::Lines);
+//            node = par ;
+//        }
+
         //draw ellipse
-            sf::CircleShape ellipse;
-            ellipse.setRadius(1);
-            ellipse.setOrigin(1,1);
-            ellipse.setScale(half_width*scaling_factor, half_height*0.5*scaling_factor);
-            ellipse.setOutlineColor(sf::Color::Yellow);
-            ellipse.setOutlineThickness(0.008);
-            ellipse.setFillColor(sf::Color::Transparent);
+        sf::CircleShape ellipse;
+        ellipse.setRadius(1);
+        ellipse.setOrigin(1,1);
+        ellipse.setScale(half_width*scaling_factor, half_height*0.5*scaling_factor);
+        ellipse.setOutlineColor(sf::Color::Yellow);
+        ellipse.setOutlineThickness(0.1*cmin);
+        ellipse.setFillColor(sf::Color::Transparent);
 
 
-            double angle = (atan2(midline(0),midline(1))- M_PI/2 )/ M_PI*180 + 90;
-            ellipse.move(CV(center));
-            ellipse.rotate(angle);
+        double angle = (atan2(midline(0),midline(1))- M_PI/2 )/ M_PI*180;
+        ellipse.move(CV(center));
+        ellipse.rotate(angle);
 
-            window.draw(ellipse);
+        window.draw(ellipse);
     }
 }
 
@@ -278,12 +287,19 @@ vector<size_t> sort_indexes(const vector<T> &v) {
 Vector7f pickRandomPoint() {
     Vector7f random_point;
     float random_sample = randomCoordinate(0.0, 1.0);
-    if((random_sample - GOAL_SAMPLING_PROB) <= EPS and !pathFound) return stop + Vector7f::Constant(num_dim, RADIUS) ;
-    //fill in random point, might do this in a loop later on
-    for(int i = 0;i<num_dim;i++){
-        random_point(i) = randomCoordinate(bounds(i,0), bounds(i,1));
+    if((random_sample - GOAL_SAMPLING_PROB) <= EPS and !pathFound){
+        for(int i = 0;i<num_dim;i++){
+            random_point(i) = randomCoordinate(-RADIUS, RADIUS);
+        }
+        return stop + random_point ;
     }
-    return random_point;
+    //fill in random point
+    else{
+        for(int i = 0;i<num_dim;i++){
+            random_point(i) = randomCoordinate(bounds(i,0), bounds(i,1));
+        }
+        return random_point;
+    }
 }
 
 //Calculate the distance between two points
@@ -324,7 +340,7 @@ void checkDestinationReached() {
     }
     if(pathFound == 1) {
         goalIndex = nodeCnt - 1;
-        cout << "Reached!! With a distance of " << cost.back() << " units. " << endl << endl;
+        cout << "Reached!! With a distance of " << cost[goalIndex]+ distance(nodes[goalIndex],stop)<< " units. " << endl << endl;
     }
 }
 
@@ -398,7 +414,7 @@ Vector7f informed_sampling(){
     bool ok_point = false;
     while(!ok_point) {
         //Transform the random point via translation and rotation
-        Vector7f x_random = Vector7f::Random(num_dim);
+        Vector7f x_random = Vector7f::Random();
         x_tf = C*L*x_random + center;
 
         // check if within bounds for all
@@ -425,8 +441,8 @@ void RRT() {
             newPoint = pickRandomPoint();
         }
         else {
-            if (cost[goalIndex] < cbest) { // if a shorter path has been found recompute sampling region
-                cbest = cost[goalIndex];
+            if (cost[goalIndex] + distance(nodes[goalIndex],stop) < cbest) { // if a shorter path has been found recompute sampling region
+                cbest = cost[goalIndex] + distance(nodes[goalIndex],stop);
                 ellipse_param(cbest);
             }
             // sample from the ellipse
@@ -504,8 +520,9 @@ int main() {
 
     else {
         // some default values for start and stop, can be changed further on
-        start = Vector7f::Constant(num_dim, 0);
-        stop = Vector7f::Constant(num_dim, 0);
+        start = Vector7f::Constant(0);
+
+        stop = Vector7f::Constant(0);
         stop(0) = 3;
         stop(1) = 10;
 
@@ -516,7 +533,7 @@ int main() {
         proj_pc_points = project_2d(point_cloud_environment);
         WIDTH = (bounds_2d[1]-bounds_2d[0]+2)*scaling_factor;
         HEIGHT = (bounds_2d[3]-bounds_2d[2]+2)*scaling_factor;
-        sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "Basic Anytime RRT");
+        sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "Informed RRT_star");
 
         nodeCnt = 1;
         nodes.push_back(start);
@@ -538,7 +555,7 @@ int main() {
             if (iterations % 10 == 0) {
                 cout << "Iterations: " << iterations << endl;
                 if (!pathFound) cout << "Not reached yet :( " << endl;
-                else cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
+                else cout << "Shortest distance till now: " << cbest<< " units." << endl;
                 cout << endl;
             }
 
@@ -551,7 +568,7 @@ int main() {
         cout << "Number of iterations: " << iterations << endl;
         if (!pathFound) cout << "Goal not reached within max iterations or manual termination " << endl;
         else {
-            cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
+            cout << "Shortest distance till now: " << cbest << " units." << endl;
             vector<Vector7f> optimal_path = get_path();
             write_to_file(optimal_path);
         }
