@@ -465,7 +465,7 @@ void RRT() {
         // This section should only be reachable when the path IS found. This is RRT*
         // Find nearby nodes to the new node within optimal radius opt_r (function of DISK SIZE) of the new node
         for (int i = 0; i < nodeCnt; i++) {
-            float r = DISK_SIZE * pow((log(nodeCnt) / nodeCnt), 1 / (num_dim + 1));
+            float r = DISK_SIZE * pow((log(nodeCnt) / nodeCnt), 1 / (num_dim ));
             float opt_r = min(r, JUMP_SIZE);
             if ((distance(nodes[i], nextPoint) - opt_r) <= EPS and isEdgeObstacleFree(nodes[i], nextPoint))
                 nearby.push_back(i);
