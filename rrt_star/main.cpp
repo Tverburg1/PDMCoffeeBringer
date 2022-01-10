@@ -26,7 +26,7 @@ const float INF = 1e18;
 using Vector7f = Matrix<float, 7, 1> ;
 
 float JUMP_SIZE = 0.5;
-float DISK_SIZE = JUMP_SIZE ; // Ball radius around which nearby points are found
+float DISK_SIZE = 2 ; // Ball radius around which nearby points are found
 
 int scaling_factor = 30; //scaling for plotting window
 
@@ -463,9 +463,10 @@ void RRT() {
         }
 
         // This section should only be reachable when the path IS found. This is RRT*
-        // Find nearby nodes to the new node within radius optimal radius opt_r (function of DISK SIZE) of the new node
+        // Find nearby nodes to the new node within optimal radius opt_r (function of DISK SIZE) of the new node
         for (int i = 0; i < nodeCnt; i++) {
-            float opt_r = DISK_SIZE * pow((log(nodeCnt) / nodeCnt), 1 / (num_dim + 1));
+            float r = DISK_SIZE * pow((log(nodeCnt) / nodeCnt), 1 / (num_dim + 1));
+            float opt_r = min(r, JUMP_SIZE);
             if ((distance(nodes[i], nextPoint) - opt_r) <= EPS and isEdgeObstacleFree(nodes[i], nextPoint))
                 nearby.push_back(i);
         }
