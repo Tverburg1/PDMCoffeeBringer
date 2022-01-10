@@ -38,7 +38,8 @@ YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_han
 void YouBotMotionController::set_controller_callback(const youbot_msgs::BaseControlSettings &msg) {
     k_pos = Eigen::Array3f{msg.linear.k_pos, msg.linear.k_pos, msg.orientation.k_pos};
     k_vel = Eigen::Array3f{msg.linear.k_vel, msg.linear.k_vel, msg.orientation.k_vel};
-    brake_distance = Eigen::Array3f{msg.linear.brake_distance, msg.linear.brake_distance, msg.orientation.brake_distance};
+    brake_distance = Eigen::Array3f{msg.linear.brake_distance, msg.linear.brake_distance,
+                                    msg.orientation.brake_distance};
     v_current.setZero();
 }
 
@@ -66,6 +67,9 @@ Eigen::VectorXf YouBotMotionController::get_current_configuration() {
     configuration(0) = srv_base.response.link_state.pose.position.x;
     configuration(1) = srv_base.response.link_state.pose.position.y;
     configuration(2) = tf::getYaw(srv_base.response.link_state.pose.orientation);
+    if (configuration(2) < 0) {
+        configuration(2) += 2 * M_PI;
+    }
     for (int i = 1; i < 6; i++) {
         srv_joint.request.joint_name = "youbot::arm_joint_" + std::to_string(i);
         arm_position_client_.call(srv_joint);
@@ -91,6 +95,12 @@ void YouBotMotionController::move_arm(const Eigen::VectorXf &arm_configuration, 
 void YouBotMotionController::move_base_towards_position(Eigen::Vector3f position) {
     Eigen::Vector3f current_pos = get_current_configuration().head<3>();
     Eigen::Vector3f dist = position - current_pos;
+    dist(2) = std::min<float>(position(2) - current_pos(2), 2 * M_PI + current_pos(2) - position(2));
+    if (position(2) - current_pos(2) < 2 * M_PI + current_pos(2) - position(2)) {
+        dist(2) = position(2) - current_pos(2);
+    } else {
+        dist(2) = -(2 * M_PI + current_pos(2) - position(2));
+    }
     Eigen::AngleAxis<float> t(current_pos(2), Eigen::Vector3f(0, 0, 1));
 //    F = k_pos * x - k_vel * e^(-k_exp_vel * x) * v
     Eigen::Array3f brake_select = (brake_distance > dist.cwiseAbs().array()).cast<float>();
@@ -113,7 +123,7 @@ Eigen::Vector3f YouBotMotionController::get_base_velocity_from_force(Eigen::Vect
     // Calculate new velocity with a small time step dt
     Eigen::Vector4f w_acc = w_J_c * (force.array() / mass_array).matrix();
     float current_max = w_acc.cwiseAbs().maxCoeff();
-    if (current_max > w_acc_max) {
+    if (current_max > w_acc_max) { // Limit maximum acceleration
         w_acc *= w_acc_max / current_max;
     }
     Eigen::Vector3f v_new = v_current.array() + (c_J_w * w_acc).array() * dt;
@@ -133,9 +143,9 @@ void YouBotMotionController::brake() {
         pub_base_.publish(base_msg);
         return;
     }
-    Eigen::Vector3f F_opposite = -1000 * v_current;
+    Eigen::Vector3f F_opposite = -1000000 * v_current / v_current.norm();
     Eigen::Vector3f v_min = get_base_velocity_from_force(F_opposite);
-    if ((v_current.cwiseProduct(v_min).array() < 0).all()) {
+    if ((v_current.cwiseProduct(v_min).array() <= 0).all()) {
         pub_base_.publish(base_msg);
         v_current.setZero();
     } else {
@@ -153,7 +163,7 @@ void YouBotMotionController::process_configs() {
     Eigen::VectorXf config_goal = config_to_go_.front();
     Eigen::VectorXf config_current = get_current_configuration();
     ROS_INFO_STREAM("Distance to configuration goal: " << (config_goal - config_current).norm());
-    if ((config_goal - config_current).norm() < 0.01) { // Configuration reached
+    if ((config_goal - config_current).norm() < 0.1) { // Configuration reached
         ROS_INFO_STREAM("Reached configuration, number configurations to go: " << config_to_go_.size());
         previous_config_ = config_goal;
         config_to_go_.pop();

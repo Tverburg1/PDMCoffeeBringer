@@ -66,6 +66,9 @@ int main(int argc, char **argv) {
     std::string path_str;
     if (ros::param::has("/youbot/configurations_path")) {
         ros::param::get("/youbot/configurations_path", path_str);
+    } else {
+        ROS_INFO_STREAM("rosparam /youbot/configurations_path not set");
+        return 0;
     }
     ROS_INFO_STREAM("Reading: " << path_str);
     Eigen::MatrixXd mat = readMatrix(path_str.c_str());
