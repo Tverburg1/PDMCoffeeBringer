@@ -123,10 +123,6 @@ Matrix<float, num_dim, 2> get_bounds(){
 }
 Matrix<float, num_dim, 2> bounds;
 
-//Vector7f diff = bounds.col(1)-bounds.col(0);
-//float JUMP_SIZE = diff.sum()/(pow(100.0,num_dim)); // same as before but now generalized
-
-
 vector < Vector7f > nodes;
 vector < int > parent, nearby ;
 vector < float > cost, jumps ;
@@ -179,10 +175,10 @@ sf::Vector2f CV(VectorXf configuration){
 void draw(sf::RenderWindow& window) {
     sf::Vertex line[2]; sf::CircleShape nodeCircle; sf::CircleShape pc_circle;
 
-    // Uncomment if circular nodes are to be drawn
+    // Draw circular nodes
     for(auto& node: nodes) {
-        nodeCircle.setRadius(RADIUS/2.5); // nodeCircle.setRadius(min(2.0, RADIUS/2.0));
-        nodeCircle.setOrigin(RADIUS/2.5, RADIUS/2.5);
+        nodeCircle.setRadius(RADIUS); // nodeCircle.setRadius(min(2.0, RADIUS/2.0));
+        nodeCircle.setOrigin(RADIUS, RADIUS);
         nodeCircle.setFillColor(sf::Color(0, 255, 171)); nodeCircle.setPosition(CV(node));
         window.draw(nodeCircle);
     }
@@ -203,10 +199,10 @@ void draw(sf::RenderWindow& window) {
     }
     // draw start point and stop point
     sf::CircleShape startingPoint, endingPoint ;
-    startingPoint.setRadius(RADIUS); endingPoint.setRadius(RADIUS);
+    startingPoint.setRadius(RADIUS*2); endingPoint.setRadius(RADIUS*2);
     startingPoint.setFillColor(sf::Color::Green); endingPoint.setFillColor(sf::Color::Magenta);
     startingPoint.setPosition(CV(start)); endingPoint.setPosition(CV(stop));
-    startingPoint.setOrigin(RADIUS/2, RADIUS/2); endingPoint.setOrigin(RADIUS/2, RADIUS/2);
+    startingPoint.setOrigin(RADIUS*2, RADIUS*2); endingPoint.setOrigin(RADIUS*2, RADIUS*2);
 
     window.draw(startingPoint); window.draw(endingPoint);
 
@@ -220,15 +216,6 @@ void draw(sf::RenderWindow& window) {
             window.draw(line, 2, sf::Lines);
         }
 
-//        int node = goalIndex;
-//        while(parent[node] != node) {
-//            int par = parent[node];
-//            line[0] = sf::Vertex(CV(nodes[par]));
-//            line[1] = sf::Vertex(CV(nodes[node]));
-//            line[0].color = line[1].color = sf::Color::Red; // orange color
-//            window.draw(line, 2, sf::Lines);
-//            node = par ;
-//        }
 
         //draw ellipse
         sf::CircleShape ellipse;
@@ -344,21 +331,6 @@ void checkDestinationReached() {
     }
 }
 
-/* Inserts nodes on the path from rootIndex till Point q such
-   that successive nodes on the path are not more than
-   JUMP_SIZE distance away */
-//void insertNodesInPath(int rootIndex, Vector7f& q) {
-//	Vector7f p = nodes[rootIndex] ;
-//	if(!isEdgeObstacleFree(p, q)) return ;
-//	while(!(p == q)) {
-//		Vector7f nxt = steering(p, q, JUMP_SIZE);
-//		nodes.push_back(nxt);
-//		parent.push_back(rootIndex);
-//		cost.push_back(cost[rootIndex] + distance(p, nxt));
-//		rootIndex = nodeCnt++ ;
-//		p = nxt ;
-//	}
-//}
 
 /*  Rewires the parents of the tree greedily starting from
 	the new node found in this iteration as the parent */
@@ -575,27 +547,5 @@ int main() {
 
     }
 }
-//
-//        while (iterations < max_iterations and !pathFound) { // Is purely for testing, for actual use you should not stop once a path has been found
-//            RRT();
-//            iterations++;
-//
-//            if (iterations % 10 == 0) {
-//                cout << "Number of iterations: " << iterations << endl;
-//                if (!pathFound) cout << "Not reached yet" << endl;
-//                else cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
-//                cout << endl;
-//            }
-//
-//        }
-//        cout << "Number of iterations: " << iterations << endl;
-//        if (!pathFound) cout << "Goal not reached within max iterations :( " << endl;
-//        else {
-//            cout << "Shortest distance till now: " << cost[goalIndex] << " units." << endl;
-//            vector<Vector7f> optimal_path = get_path();
-//            write_to_file(optimal_path);
-//        }
-//    }
-//
-//}
+
 
