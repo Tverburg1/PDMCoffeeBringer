@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <launch>
 
-  <arg name="world" default="empty_world"/>
-  <arg name="init_pos_x" default="0.0"/>
-  <arg name="init_pos_y" default="0.0"/>
+  <arg name="world" default="my_world"/>
+  <arg name="init_pos_x" default="3.0"/>
+  <arg name="init_pos_y" default="10.0"/>
   <arg name="init_pos_z" default="0.0"/>
 
   <!-- launch world -->
