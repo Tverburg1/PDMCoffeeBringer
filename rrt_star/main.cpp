@@ -223,7 +223,7 @@ void draw(sf::RenderWindow& window) {
         ellipse.setOrigin(1,1);
         ellipse.setScale(half_width*scaling_factor, half_height*0.5*scaling_factor);
         ellipse.setOutlineColor(sf::Color::Yellow);
-        ellipse.setOutlineThickness(0.3);
+        ellipse.setOutlineThickness(0.05);
         ellipse.setFillColor(sf::Color::Transparent);
 
 
