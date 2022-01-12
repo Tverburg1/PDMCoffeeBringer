@@ -1,4 +1,5 @@
 # PDMCoffeeBringer
+This code was created and tested for linux.
 
 Instructions for running the rrt_star code:
 Just compile using the CMakeList.txt file in the directory "rrt_star".
