@@ -22,8 +22,7 @@ public:
 
     std::queue<Eigen::VectorXf> config_to_go_;
     Eigen::VectorXf previous_config_;
-    ros::Publisher pub_base_;
-    ros::Publisher pub_arm_;
+    ros::Publisher pub_base_, pub_arm_, pub_force_, pub_goal_;
 
     Eigen::VectorXf get_current_configuration();
 

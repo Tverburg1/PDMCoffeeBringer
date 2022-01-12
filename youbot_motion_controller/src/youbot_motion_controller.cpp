@@ -5,6 +5,8 @@ YouBotMotionController::YouBotMotionController(ros::NodeHandle &private_node_han
     sub_config_ = nh_.subscribe("/youbot/control", 1000, &YouBotMotionController::control_callback, this);
     sub_pid_ = nh_.subscribe("/youbot/base/set_controller", 10, &YouBotMotionController::set_controller_callback, this);
     pub_base_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 100);
+    pub_force_ = nh_.advertise<geometry_msgs::Twist>("/youbot/base/applied_force", 100);
+    pub_goal_ = nh_.advertise<youbot_msgs::Control>("/youbot/config_goal", 100);
     pub_arm_ = nh_.advertise<trajectory_msgs::JointTrajectory>("/arm_1/arm_controller/command", 100);
     base_position_client_ = nh_.serviceClient<gazebo_msgs::GetLinkState>("/gazebo/get_link_state");
     arm_position_client_ = nh_.serviceClient<gazebo_msgs::GetJointProperties>("/gazebo/get_joint_properties");
@@ -95,41 +97,58 @@ void YouBotMotionController::move_arm(const Eigen::VectorXf &arm_configuration, 
 void YouBotMotionController::move_base_towards_position(Eigen::Vector3f position) {
     Eigen::Vector3f current_pos = get_current_configuration().head<3>();
     Eigen::Vector3f dist = position - current_pos;
-    dist(2) = std::min<float>(position(2) - current_pos(2), 2 * M_PI + current_pos(2) - position(2));
     if (position(2) - current_pos(2) < 2 * M_PI + current_pos(2) - position(2)) {
         dist(2) = position(2) - current_pos(2);
     } else {
         dist(2) = -(2 * M_PI + current_pos(2) - position(2));
     }
+    // Possibly there is a singularity in 0, so also for one in pi is created and compared
+    float sing_current_pos = (current_pos(2) > M_PI) ? current_pos(2) - 2 * M_PI : current_pos(2);
+    float sing_pos = (position(2) > M_PI) ? position(2) - 2 * M_PI : position(2);
+    float sing_dist;
+    if (sing_pos - sing_current_pos < 2*M_PI + sing_current_pos - sing_pos){
+        sing_dist = sing_pos - sing_current_pos;
+    } else {
+        sing_dist = -(2*M_PI + sing_current_pos - sing_pos);
+    }
+    if (std::abs(sing_dist) < std::abs(dist(2))) {
+        dist(2) = sing_dist;
+    }
+
     Eigen::AngleAxis<float> t(current_pos(2), Eigen::Vector3f(0, 0, 1));
-//    F = k_pos * x - k_vel * e^(-k_exp_vel * x) * v
+//    F = k_pos * x - u(goal_pos - brake_distance) * k_vel * v
     Eigen::Array3f brake_select = (brake_distance > dist.cwiseAbs().array()).cast<float>();
     Eigen::Vector3f force = k_pos * (t.inverse() * dist).array() - k_vel * brake_select * v_current.array();
     apply_force_on_base(force);
 }
 
 void YouBotMotionController::apply_force_on_base(Eigen::Vector3f &force) {
-    geometry_msgs::Twist base_msg;
+    geometry_msgs::Twist base_msg, force_msg;
+    force_msg.linear.x = force.x();
+    force_msg.linear.y = force.y();
+    force_msg.angular.z = force.z();
     // Check domain of input velocity
     v_current = get_base_velocity_from_force(force);
     base_msg.linear.x = v_current.x();
     base_msg.linear.y = v_current.y();
     base_msg.angular.z = v_current.z();
     pub_base_.publish(base_msg);
+    pub_force_.publish(force_msg);
+
 }
 
 Eigen::Vector3f YouBotMotionController::get_base_velocity_from_force(Eigen::Vector3f &force) const {
     float w_acc_max = T_max / I_wheel;
     // Calculate new velocity with a small time step dt
     Eigen::Vector4f w_acc = w_J_c * (force.array() / mass_array).matrix();
-    float current_max = w_acc.cwiseAbs().maxCoeff();
+    float current_max = w_acc.cwiseAbs().maxCoeff();  // Wheel with the highest acceleration
     if (current_max > w_acc_max) { // Limit maximum acceleration
         w_acc *= w_acc_max / current_max;
     }
     Eigen::Vector3f v_new = v_current.array() + (c_J_w * w_acc).array() * dt;
     // Limit velocity so it is lower than the maximal velocity
     Eigen::Vector4f w = w_J_c * v_new;
-    current_max = w.cwiseAbs().maxCoeff();
+    current_max = w.cwiseAbs().maxCoeff();  // Wheel with the highest angular velocity
     if (current_max > w_max) {
         w *= w_max / current_max;
         v_new = c_J_w * w;
@@ -143,9 +162,11 @@ void YouBotMotionController::brake() {
         pub_base_.publish(base_msg);
         return;
     }
+    // Check if, when accelerating to the other side as fast as possible, the velocity becomes opposite
     Eigen::Vector3f F_opposite = -1000000 * v_current / v_current.norm();
     Eigen::Vector3f v_min = get_base_velocity_from_force(F_opposite);
-    if ((v_current.cwiseProduct(v_min).array() <= 0).all()) {
+    // With <= 0 possible end could be an oscillation, so <= almost 0 is used
+    if ((v_current.cwiseProduct(v_min).array() <= 0.001).all()) {
         pub_base_.publish(base_msg);
         v_current.setZero();
     } else {
@@ -170,7 +191,18 @@ void YouBotMotionController::process_configs() {
         arm_on_its_way = false;
         return;
     }
-
+    // Publish current goal
+    youbot_msgs::Control control_msg;
+    control_msg.X = config_goal(0);
+    control_msg.Y = config_goal(1);
+    control_msg.theta = config_goal(2);
+    control_msg.joint_1 = config_goal(3);
+    control_msg.joint_2 = config_goal(4);
+    control_msg.joint_3 = config_goal(5);
+    control_msg.joint_4 = config_goal(6);
+    control_msg.joint_5 = config_goal(7);
+    pub_goal_.publish(control_msg);
+    // Move base towards goal
     move_base_towards_position(config_goal.head<3>());
 
     if (!arm_on_its_way) {
