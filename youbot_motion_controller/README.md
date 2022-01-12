@@ -17,7 +17,9 @@ The YouBotMotionController package has been tested under [ROS] Noetic on respect
 This is research code, expect that it changes often and any fitness for a particular purpose is disclaimed.
 
 ## Installation
-Installation instructions are provided in the [README](README.md) of the entire project.
+Installation instructions are provided in the README of the entire project.
+### Dependencies
+* [youbot_description]
 
 ## Usage
 Run the main node with
@@ -50,7 +52,7 @@ Controller for the base and arm of the YouBot.
 * **`/youbot/control`** ([youbot_msgs/Control])<br>
   The configuration the YouBot should go to.
 * **`/youbot/base/set_controller`** ([youbot_msgs/ControlSettings])<br>
-  The settings the controller of the base should use, the input force is calculated in the following way: `F = k_pos * x - k_vel * e^(-k_exp_vel * |x|) * v`, where `x` is the distance and `v` the velocity.
+  The settings the controller of the base should use, the input force is calculated in the following way: `F = k_pos * x - u(goal_position - brake_distance) * k_vel * v`, where `x` is the distance and `v` the velocity.
 #### Published Topics
 * **`/cmd_vel`**: Sets the velocity of the YouBot base.
 * **`/arm_1/arm_controller/command`**: Configuration the arm should go to.
