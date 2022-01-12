@@ -20,6 +20,7 @@ This is research code, expect that it changes often and any fitness for a partic
 Installation instructions are provided in the README of the entire project.
 ### Dependencies
 * [youbot_description]
+* [Eigen]
 
 ## Usage
 Run the main node with
@@ -66,6 +67,7 @@ Please report bugs and request features using the [Issue Tracker].
 [PDMCoffeeBringer]: https://github.com/Tverburg1/PDMCoffeeBringer
 [youbot_description]: https://github.com/Tstienstra/youbot_description
 [youbot_simulation]: https://github.com/Tstienstra/youbot_simulation
+[Eigen]: http://wiki.ros.org/eigen
 [youbot_msgs/Control]: https://github.com/Tverburg1/PDMCoffeeBringer/blob/main/youbot_msgs/msg/Control.msg
 [youbot_msgs/ControlSettings]: https://github.com/Tverburg1/PDMCoffeeBringer/blob/main/youbot_msgs/msg/ControlSettings.msg
 [Issue Tracker]: https://github.com/Tverburg1/PDMCoffeeBringer/issues
